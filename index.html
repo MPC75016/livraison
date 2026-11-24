@@ -286,7 +286,7 @@ let sigCtx, dessin=false, signe=false, prestation = "";
   Object.keys(RESTAURANTS).forEach(n => { const o=document.createElement("option"); o.value=n; dl.appendChild(o); });
   $("dest").addEventListener("input", e => { const k = Object.keys(RESTAURANTS).find(n => n.toLowerCase() === e.target.value.trim().toLowerCase()); if (k && RESTAURANTS[k]) $("adr").value = RESTAURANTS[k]; });
   const sel = $("prestation");
-  Object.keys(PRESTATIONS).forEach(p => { const o=document.createElement("option"); o.value=p; o.textContent=p; sel.appendChild(o); });
+  Object.keys(PRESTATIONS).sort((x,y)=> x.startsWith("Autre") ? 1 : y.startsWith("Autre") ? -1 : x.localeCompare(y,"fr")).forEach(p => { const o=document.createElement("option"); o.value=p; o.textContent=p; sel.appendChild(o); });
   sel.addEventListener("change", () => choisirPrestation(sel.value));
   const now = new Date();
   $("date").value = dateLocale(now);
