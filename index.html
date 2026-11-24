@@ -58,6 +58,7 @@
   <div class="card">
     <h2>Prestation</h2>
     <select id="prestation"><option value="">— Choisir la prestation —</option></select>
+    <div id="blocAutre" style="display:none"><label for="autreLib">Nom de la prestation</label><input id="autreLib" placeholder="Ex : Désinfection, nettoyage de hotte seule…"></div>
   </div>
 
   <div class="card">
@@ -260,7 +261,14 @@ const PRESTATIONS = {
   "Nettoyage Kärcher": {titre:"Travaux réalisés", col:"Zone traitée", qcol:"Détail", ph:"Zone traitée", qph:"Détail",
     rapides:["Façade","Terrasse","Sols extérieurs","Parking","Local poubelles","Cour","Surface traitée (m²)"]},
   "Nettoyage cuisine": {titre:"Travaux réalisés", col:"Travail réalisé", qcol:"Détail", ph:"Travail réalisé", qph:"Détail",
-    rapides:["Hotte et filtres","Sols","Plans de travail","Murs et faïences","Friteuses","Fours / pianos","Chambres froides","Plonge","Évacuations / siphons"]}
+    rapides:["Hotte et filtres","Sols","Plans de travail","Murs et faïences","Friteuses","Fours / pianos","Chambres froides","Plonge","Évacuations / siphons"]},
+  "Nettoyage vitres / façades": {titre:"Travaux réalisés", col:"Zone traitée", qcol:"Détail", ph:"Zone traitée", qph:"Détail",
+    rapides:["Vitres intérieures","Vitres extérieures","Vitrine","Façade","Encadrements et châssis","Enseigne","Surface traitée (m²)"]},
+  "Traitement des sols": {titre:"Travaux réalisés", col:"Sol traité", qcol:"Détail", ph:"Sol traité", qph:"Détail",
+    rapides:["Shampoing moquette","Décapage","Cristallisation marbre","Vitrification parquet","Lustrage","Pose d'émulsion","Surface traitée (m²)"]},
+  "Nettoyage après travaux": {titre:"Travaux réalisés", col:"Travail réalisé", qcol:"Détail", ph:"Travail réalisé", qph:"Détail",
+    rapides:["Dépoussiérage","Lavage des sols","Vitres","Sanitaires","Portes et menuiseries","Traces de peinture / plâtre","Évacuation des déchets"]},
+  "Autre (préciser)": {titre:"Travaux réalisés", col:"Travail réalisé", qcol:"Détail", ph:"Travail réalisé", qph:"Détail", rapides:[]}
 };
 const GENERIQUE = {titre:"Détail de la prestation", col:"Détail", qcol:"Quantité / détail", ph:"Choisissez d'abord la prestation", qph:"", rapides:[]};
 // Webhook Make : envoie le bon par mail (PDF joint), dans Notion (LIVRAISON TRANSPORT) et sur OneDrive
@@ -295,6 +303,7 @@ function dateLocale(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000)
 
 function choisirPrestation(p){
   prestation = p; const P = PRESTATIONS[p] || GENERIQUE;
+  $("blocAutre").style.display = p==="Autre (préciser)" ? "block" : "none";
   $("titreDetail").textContent = P.titre;
   const c=$("chips"); c.innerHTML="";
   P.rapides.forEach(a => { const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent="+ "+a; b.onclick=()=>ajouterArticle(a); c.appendChild(b); });
@@ -371,7 +380,7 @@ function genererPDF(data){
   doc.setFillColor(11,61,110); doc.rect(0,0,W,36,"F");
   doc.addImage(LOGO,"PNG",M,3,32,30);
   doc.setTextColor(255); doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.text("Bon de réception", W/2, 15, {align:"center"});
-  doc.setFontSize(11); doc.setFont("helvetica","normal"); doc.text(data.prestation, W/2, 23, {align:"center"});
+  doc.setFontSize(11); doc.setFont("helvetica","normal"); doc.text(data.libelle, W/2, 23, {align:"center"});
   doc.setFontSize(10);
   doc.text("N° "+data.numero, W-M, 15, {align:"right"});
   doc.text(fr(data.date)+(horaires(data)?"  "+horaires(data):""), W-M, 22, {align:"right"});
@@ -424,7 +433,7 @@ function genererPDF(data){
 async function valider(){
   const data = {
     numero: "BR-"+new Date().toISOString().replace(/\D/g,"").slice(0,12),
-    prestation, destinataire: nomClient($("dest").value.trim()), adresse: $("adr").value.trim(),
+    prestation, libelle: prestation==="Autre (préciser)" ? ($("autreLib").value.trim() ? "Autre – "+$("autreLib").value.trim() : "") : prestation, destinataire: nomClient($("dest").value.trim()), adresse: $("adr").value.trim(),
     date: $("date").value, hdebut: $("hdebut").value, hfin: $("hfin").value, livreur: $("livreur").value.trim(),
     mailclient: $("mailclient").value.trim(),
     articles: lireArticles(), etat: document.querySelector('input[name=etat]:checked').value,
@@ -432,6 +441,7 @@ async function valider(){
     signature: signe ? $("sig").toDataURL("image/png") : null, photosAvant, photosApres
   };
   if (!data.prestation) return message("Choisissez la prestation dans la liste.");
+  if (!data.libelle) return message("Précisez le nom de la prestation.");
   if (!data.destinataire) return message("Indiquez le client.");
   if (!data.articles.length) return message("Ajoutez au moins une ligne dans « "+PRESTATIONS[prestation].titre+" ».");
   if (data.mailclient && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.mailclient)) return message("L'e-mail du client n'est pas valide.");
@@ -443,7 +453,7 @@ async function valider(){
   const btn=$("envoyer"); btn.disabled=true; btn.textContent="Envoi en cours…";
   const doc = genererPDF(data);
   dernierPDF = doc.output("blob");
-  dernierNom = `Bon_de_reception_${data.prestation}_${data.destinataire}_${data.date}`.normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^\w-]+/g,"_")+".pdf";
+  dernierNom = `Bon_de_reception_${data.libelle}_${data.destinataire}_${data.date}`.normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^\w-]+/g,"_")+".pdf";
 
   const P = PRESTATIONS[data.prestation];
   const listeArticles = data.articles.map(a=>`${a.nom} : ${a.qte||"-"}`).join("\n");
@@ -451,7 +461,7 @@ async function valider(){
   const t = s => ({rich_text:[{text:{content:(s||"").slice(0,1900)}}]});
   const props = {
     "Numéro":{title:[{text:{content:data.numero}}]},
-    "Prestation":{select:{name:data.prestation}},
+    "Prestation":{select:{name:data.prestation==="Autre (préciser)"?"Autre":data.prestation}}, "Précision prestation":t(data.prestation==="Autre (préciser)"?data.libelle.replace(/^Autre – /,""):""),
     "Restaurant":t(data.destinataire), "Adresse":t(data.adresse),
     "Date":{date:{start:data.date}}, "Horaires":t(horaires(data)),
     "Réalisé par":t(data.livreur), "Réceptionné par":t(data.receptionnaire),
@@ -462,19 +472,19 @@ async function valider(){
   const notion = {parent:{database_id:NOTION_DB}, properties:props};
   const esc = s => (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const lignes = data.articles.map(a=>esc(a.nom)+" : "+esc(a.qte||"-")).join("<br>");
-  const resume = `<h2 style="color:#0b3d6e">Bon de réception ${data.numero} – ${esc(data.prestation)}</h2>
+  const resume = `<h2 style="color:#0b3d6e">Bon de réception ${data.numero} – ${esc(data.libelle)}</h2>
 <p><b>Client :</b> ${esc(data.destinataire)}<br><b>Adresse :</b> ${esc(data.adresse)}<br>
 <b>Date :</b> ${fr(data.date)} ${horaires(data)}<br><b>Réalisé par :</b> ${esc(data.livreur)}<br>
 <b>Réceptionné par :</b> ${esc(data.receptionnaire)}<br><b>État :</b> ${data.etat}${data.mailclient?"<br><b>Rapport envoyé au client :</b> "+esc(data.mailclient):""}</p>
 <p><b>${esc(P.titre)} :</b><br>${lignes}</p>
 <p><b>Observations :</b><br>${esc(data.infos)||"-"}</p><p>Le bon signé est en pièce jointe (PDF).</p>`;
   const client_html = `<p>Bonjour,</p>
-<p>Veuillez trouver ci-joint le bon de réception de notre prestation <b>${esc(data.prestation.toLowerCase())}</b> réalisée le ${fr(data.date)} pour <b>${esc(data.destinataire)}</b>${data.adresse?" ("+esc(data.adresse)+")":""}.</p>
+<p>Veuillez trouver ci-joint le bon de réception de notre prestation <b>${esc(data.libelle.replace(/^Autre – /,"").toLowerCase())}</b> réalisée le ${fr(data.date)} pour <b>${esc(data.destinataire)}</b>${data.adresse?" ("+esc(data.adresse)+")":""}.</p>
 <p><b>${esc(P.titre)} :</b><br>${lignes}</p>
 ${data.infos?`<p><b>Observations :</b><br>${esc(data.infos)}</p>`:""}
 <p>Bon signé par ${esc(data.receptionnaire)}.</p>
 <p>Nous restons à votre disposition pour toute question.<br>Cordialement,<br><b>L'équipe MADY PROCLEAN</b><br>interventions@madyproclean.com</p>`;
-  const payload = {numero:data.numero, prestation:data.prestation, restaurant:data.destinataire, adresse:data.adresse,
+  const payload = {numero:data.numero, prestation:data.libelle, restaurant:data.destinataire, adresse:data.adresse,
     date_iso:data.date, heure:horaires(data), livreur:data.livreur, receptionnaire:data.receptionnaire, articles:listeArticles,
     etat:data.etat, infos:data.infos, mail_client:data.mailclient, resume_html:resume, client_html,
     notion_body:JSON.stringify(notion), pdf_base64:b64, pdf_nom:dernierNom};
@@ -517,7 +527,7 @@ function nouveau(){
   $("articles").innerHTML=""; ajouterArticle(); photosAvant.length=0; photosApres.length=0;
   $("apercuAvant").innerHTML=""; $("apercuApres").innerHTML=""; effacerSig();
   const now=new Date(); $("date").value=dateLocale(now); $("hfin").value=now.toTimeString().slice(0,5);
-  $("prestation").value=""; choisirPrestation("");
+  $("prestation").value=""; $("autreLib").value=""; choisirPrestation("");
   $("msg").className=""; $("after").style.display="none"; window.scrollTo(0,0);
 }
 </script>
