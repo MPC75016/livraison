@@ -298,6 +298,7 @@ let sigCtx, dessin=false, signe=false, prestation = "";
   brancherPhotos("photosApres","apercuApres",()=>photosApres);
 })();
 
+function numeroBon(){ const d=new Date(), p=n=>String(n).padStart(2,"0"); return `BR-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
 function nomClient(v){ return Object.keys(RESTAURANTS).find(n => n.toLowerCase() === v.toLowerCase()) || v; }
 function dateLocale(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 
@@ -432,7 +433,7 @@ function genererPDF(data){
 
 async function valider(){
   const data = {
-    numero: "BR-"+new Date().toISOString().replace(/\D/g,"").slice(0,12),
+    numero: numeroBon(),
     prestation, libelle: prestation==="Autre (préciser)" ? ($("autreLib").value.trim() ? "Autre – "+$("autreLib").value.trim() : "") : prestation, destinataire: nomClient($("dest").value.trim()), adresse: $("adr").value.trim(),
     date: $("date").value, hdebut: $("hdebut").value, hfin: $("hfin").value, livreur: $("livreur").value.trim(),
     mailclient: $("mailclient").value.trim(),
