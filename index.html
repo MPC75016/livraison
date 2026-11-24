@@ -35,6 +35,7 @@
   .choix input,.etat input{display:none}
   .choix label:has(input:checked),.etat label:has(input:checked){background:var(--bleu2);border-color:var(--bleu2);color:#fff}
   .etat{display:flex;gap:8px}.etat label{flex:1}
+  #prestation{font-weight:600;color:var(--bleu);padding:13px 12px}
   #sig{width:100%;height:180px;border:2px dashed var(--bord);border-radius:8px;background:#fff;touch-action:none}
   .small{font-size:12px;color:#667}
   .photos{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
@@ -56,7 +57,7 @@
 <main>
   <div class="card">
     <h2>Prestation</h2>
-    <div class="choix" id="choix"></div>
+    <select id="prestation"><option value="">— Choisir la prestation —</option></select>
   </div>
 
   <div class="card">
@@ -244,15 +245,24 @@ const RESTAURANTS = {
 };
 // Types de prestation : titre de la section, colonnes et raccourcis
 const PRESTATIONS = {
-  "Transport ou Livraison": {titre:"Articles livrés", col:"Article", qcol:"Quantité", ph:"Article", qph:"Qté",
+  "Livraison": {titre:"Articles livrés", col:"Article", qcol:"Quantité", ph:"Article", qph:"Qté",
     rapides:["Tables","Chaises","Produits d'entretien","Matériel de nettoyage","Sacs poubelle","Consommables"]},
-  "Nettoyage cuisine": {titre:"Travaux réalisés", col:"Travail réalisé", qcol:"Détail", ph:"Travail réalisé", qph:"Détail",
-    rapides:["Hotte et filtres","Sols","Plans de travail","Murs et faïences","Friteuses","Fours / pianos","Chambres froides","Plonge","Évacuations / siphons"]},
-  "Nettoyage après travaux": {titre:"Travaux réalisés", col:"Travail réalisé", qcol:"Détail", ph:"Travail réalisé", qph:"Détail",
-    rapides:["Dépoussiérage","Lavage des sols","Vitres","Sanitaires","Portes et menuiseries","Traces de peinture / plâtre","Évacuation des déchets"]},
+  "Transport": {titre:"Éléments transportés", col:"Élément", qcol:"Quantité", ph:"Élément", qph:"Qté",
+    rapides:["Mobilier","Matériel","Électroménager","Cartons","Palettes","Lieu de départ"]},
   "Débarras": {titre:"Éléments évacués", col:"Élément", qcol:"Quantité", ph:"Élément", qph:"Qté",
-    rapides:["Meubles","Électroménager","Encombrants","Cartons","Gravats","Volume total (m³)","Dépôt en déchetterie"]}
+    rapides:["Meubles","Électroménager","Encombrants","Cartons","Gravats","Volume total (m³)","Dépôt en déchetterie"]},
+  "Nettoyage général": {titre:"Travaux réalisés", col:"Travail réalisé", qcol:"Détail", ph:"Travail réalisé", qph:"Détail",
+    rapides:["Sols","Sanitaires","Dépoussiérage","Vitres accessibles","Mobilier","Portes et points de contact","Poubelles"]},
+  "Remise en état général": {titre:"Travaux réalisés", col:"Travail réalisé", qcol:"Détail", ph:"Travail réalisé", qph:"Détail",
+    rapides:["Décapage des sols","Lessivage des murs","Détartrage des sanitaires","Vitres","Dépoussiérage en hauteur","Traces et taches","Évacuation des déchets"]},
+  "Nettoyage avant commission de sécurité": {titre:"Travaux réalisés", col:"Travail réalisé", qcol:"Détail", ph:"Travail réalisé", qph:"Détail",
+    rapides:["Hottes et conduits","Filtres","Cuisine","Issues de secours dégagées","Locaux techniques","Sols","Évacuation des déchets"]},
+  "Nettoyage Kärcher": {titre:"Travaux réalisés", col:"Zone traitée", qcol:"Détail", ph:"Zone traitée", qph:"Détail",
+    rapides:["Façade","Terrasse","Sols extérieurs","Parking","Local poubelles","Cour","Surface traitée (m²)"]},
+  "Nettoyage cuisine": {titre:"Travaux réalisés", col:"Travail réalisé", qcol:"Détail", ph:"Travail réalisé", qph:"Détail",
+    rapides:["Hotte et filtres","Sols","Plans de travail","Murs et faïences","Friteuses","Fours / pianos","Chambres froides","Plonge","Évacuations / siphons"]}
 };
+const GENERIQUE = {titre:"Détail de la prestation", col:"Détail", qcol:"Quantité / détail", ph:"Choisissez d'abord la prestation", qph:"", rapides:[]};
 // Webhook Make : envoie le bon par mail (PDF joint), dans Notion (LIVRAISON TRANSPORT) et sur OneDrive
 const MAKE_WEBHOOK = "https://hook.eu1.make.com/hecbpej4t1ij7ndq37y9a25pmu51clcs";
 const NOTION_DB = "4226f5311d5381029af8d171f3556bd0";
@@ -261,20 +271,15 @@ const NOTION_DB = "4226f5311d5381029af8d171f3556bd0";
 const $ = id => document.getElementById(id);
 const LOGO = $("logo").src;
 let photosAvant = [], photosApres = [], dernierPDF = null, dernierNom = "";
-let sigCtx, dessin=false, signe=false, prestation = "Transport ou Livraison";
+let sigCtx, dessin=false, signe=false, prestation = "";
 
 (function init(){
   const dl = $("restos");
   Object.keys(RESTAURANTS).forEach(n => { const o=document.createElement("option"); o.value=n; dl.appendChild(o); });
   $("dest").addEventListener("input", e => { const k = Object.keys(RESTAURANTS).find(n => n.toLowerCase() === e.target.value.trim().toLowerCase()); if (k && RESTAURANTS[k]) $("adr").value = RESTAURANTS[k]; });
-  const ch = $("choix");
-  Object.keys(PRESTATIONS).forEach((p,i) => {
-    const l=document.createElement("label");
-    l.innerHTML='<input type="radio" name="prestation"'+(i===0?" checked":"")+'><span></span>';
-    l.querySelector("input").value=p; l.querySelector("span").textContent=p;
-    l.querySelector("input").onchange=()=>choisirPrestation(p);
-    ch.appendChild(l);
-  });
+  const sel = $("prestation");
+  Object.keys(PRESTATIONS).forEach(p => { const o=document.createElement("option"); o.value=p; o.textContent=p; sel.appendChild(o); });
+  sel.addEventListener("change", () => choisirPrestation(sel.value));
   const now = new Date();
   $("date").value = dateLocale(now);
   $("hfin").value = now.toTimeString().slice(0,5);
@@ -289,20 +294,20 @@ function nomClient(v){ return Object.keys(RESTAURANTS).find(n => n.toLowerCase()
 function dateLocale(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 
 function choisirPrestation(p){
-  prestation = p; const P = PRESTATIONS[p];
+  prestation = p; const P = PRESTATIONS[p] || GENERIQUE;
   $("titreDetail").textContent = P.titre;
   const c=$("chips"); c.innerHTML="";
   P.rapides.forEach(a => { const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent="+ "+a; b.onclick=()=>ajouterArticle(a); c.appendChild(b); });
   const lignes=[...document.querySelectorAll(".art")];
   if (!lignes.some(l=>l.querySelector(".nom").value)) { $("articles").innerHTML=""; ajouterArticle(); }
   document.querySelectorAll(".art").forEach(l=>{ l.querySelector(".nom").placeholder=P.ph; l.querySelector(".qte").placeholder=P.qph; });
-  const livr = p==="Transport ou Livraison";
+  const livr = p==="Livraison" || p==="Transport";
   $("lblAvant").textContent = livr ? "Photos au chargement (facultatif)" : "Avant (facultatif)";
   $("lblApres").textContent = livr ? "Photos à la livraison (facultatif)" : "Après (facultatif)";
 }
 
 function ajouterArticle(nom="", qte=""){
-  const P = PRESTATIONS[prestation];
+  const P = PRESTATIONS[prestation] || GENERIQUE;
   const vide = [...document.querySelectorAll(".art")].find(l => !l.querySelector(".nom").value);
   if (nom && vide){ vide.querySelector(".nom").value = nom; vide.querySelector(".qte").focus(); return; }
   const d = document.createElement("div"); d.className="art";
@@ -401,7 +406,7 @@ function genererPDF(data){
   if (data.signature) doc.addImage(data.signature, "PNG", M+2, y+2, 76, 30);
   doc.setFontSize(9); doc.text("Signature", M, y+39); doc.setFontSize(11);
 
-  const livr = data.prestation==="Transport ou Livraison";
+  const livr = data.prestation==="Livraison" || data.prestation==="Transport";
   [[livr?"Photos au chargement":"Photos avant", data.photosAvant],[livr?"Photos à la livraison":"Photos après", data.photosApres]].forEach(([titre, liste])=>{
     if (!liste.length) return;
     doc.addPage(); y=20; doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.text(titre, M, y); doc.setFontSize(11); y+=6;
@@ -426,6 +431,7 @@ async function valider(){
     infos: $("infos").value.trim(), receptionnaire: $("recep").value.trim(),
     signature: signe ? $("sig").toDataURL("image/png") : null, photosAvant, photosApres
   };
+  if (!data.prestation) return message("Choisissez la prestation dans la liste.");
   if (!data.destinataire) return message("Indiquez le client.");
   if (!data.articles.length) return message("Ajoutez au moins une ligne dans « "+PRESTATIONS[prestation].titre+" ».");
   if (data.mailclient && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.mailclient)) return message("L'e-mail du client n'est pas valide.");
@@ -511,6 +517,7 @@ function nouveau(){
   $("articles").innerHTML=""; ajouterArticle(); photosAvant.length=0; photosApres.length=0;
   $("apercuAvant").innerHTML=""; $("apercuApres").innerHTML=""; effacerSig();
   const now=new Date(); $("date").value=dateLocale(now); $("hfin").value=now.toTimeString().slice(0,5);
+  $("prestation").value=""; choisirPrestation("");
   $("msg").className=""; $("after").style.display="none"; window.scrollTo(0,0);
 }
 </script>
